@@ -33,10 +33,11 @@ def build_dict2attribute(target):
         result = []
         result.append('{')
         for k in target.values():
-            result.append(translate_string(k))
+            result.append(k)
             result.append(',')
 
-            result.append('}')
+        del result[len(result) - 1]
+        result.append('}')
         return "".join(result)
 
     return dict2attribute
