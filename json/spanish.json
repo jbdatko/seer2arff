@@ -1,0 +1,14 @@
+{
+    "codes" : {
+	"0" : "Non-Spanish/Non-Hispanic",
+	"1" : "Mexican (includes Chicano)",
+	"2" : "Puerto Rican",
+	"3" : "Cuban",
+	"4" : "South or Central American (except Brazil)",
+	"5" : "Other specified Spanish/Hispanic origin",
+	"6" : "Spanish, NOS",
+	"7" : "Spanish surname only (effective with diagnosis on or after 1/1/1994)",
+	"8" : "Dominican Republic (effective with diagnosis on or after 1/1/2005)",
+	"9" : "Unknown whether Spanish/Hispanic or not"
+    }
+}
