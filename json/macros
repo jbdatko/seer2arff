@@ -1,0 +1,5 @@
+(fset 'make-key-value
+   (lambda (&optional arg) "Keyboard macro." (interactive "p") (kmacro-exec-ring-item (quote ([34 6 backspace 134217830 34 58 backspace 32 58 32 34 6 backspace 4 5 34 44 14 1] 0 "%d")) arg)))
+
+(fset 'jsonify
+   (lambda (&optional arg) "Keyboard macro." (interactive "p") (kmacro-exec-ring-item (quote ([134217788 123 4 return return 16 tab 34 99 111 100 101 115 5 32 58 32 123 4 134217853 return 125 return 125 24 104 tab] 0 "%d")) arg)))

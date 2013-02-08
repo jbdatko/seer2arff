@@ -2,7 +2,7 @@
     "name" : "marital-status",
     "start" : 19,
     "length" : 1,
-    "datatype" : "dict",
+    "datatype" : "nominal",
     "codes" : {
 	"1" : "Single",
 	"2" : "Married",

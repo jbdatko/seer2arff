@@ -1,0 +1,7 @@
+{
+    "name" : "cs-extension",
+    "start" : 99,
+    "length" : 3,
+    "datatype" : "numeric",
+    "codes" : {}
+}

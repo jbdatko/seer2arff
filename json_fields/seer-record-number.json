@@ -1,0 +1,7 @@
+{
+    "name" : "seer-record-number",
+    "start" : 176,
+    "length" : 2,
+    "datatype" : "numeric",
+    "codes" : {}
+}

@@ -1,0 +1,7 @@
+{
+    "name" : "vital-status-recode",
+    "start" : 265,
+    "length" : 1,
+    "datatype" : "numeric",
+    "codes" : {}
+}

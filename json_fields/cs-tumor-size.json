@@ -1,0 +1,7 @@
+{
+    "name" : "cs-tumor-size",
+    "start" : 96,
+    "length" : 3,
+    "datatype" : "numeric",
+    "codes" : {}
+}

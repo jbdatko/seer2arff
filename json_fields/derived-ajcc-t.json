@@ -1,0 +1,7 @@
+{
+    "name" : "derived-ajcc-t",
+    "start" : 128,
+    "length" : 2,
+    "datatype" : "numeric",
+    "codes" : {}
+}

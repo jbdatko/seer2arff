@@ -1,0 +1,7 @@
+{
+    "name" : "age-at-dx",
+    "start" : 25,
+    "length" : 3,
+    "datatype" : "numeric",
+    "codes" : {}
+}

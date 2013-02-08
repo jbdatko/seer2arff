@@ -1,0 +1,7 @@
+{
+    "name" : "birth-place",
+    "start" : 32,
+    "length" : 3,
+    "datatype" : "numeric",
+    "codes" : {}
+}

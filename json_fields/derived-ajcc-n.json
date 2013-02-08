@@ -1,0 +1,7 @@
+{
+    "name" : "derived-ajcc-n",
+    "start" : 130,
+    "length" : 2,
+    "datatype" : "numeric",
+    "codes" : {}
+}
