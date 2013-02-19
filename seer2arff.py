@@ -1,11 +1,27 @@
 import os
 import re
 
-breast = "/Users/jdatko/cs610/SEER_1973_2009_TEXTDATA/incidence/yr1973_2009.seer9/BREAST.txt"
+breast =
+"/Users/jdatko/cs610/SEER_1973_2009_TEXTDATA/incidence/yr1973_2009.seer9/BREAST.txt"
+
 
 def format_blank(func):
+    """Returns a function that will format blanks in the SEER data.  Useful as a
+    decorator.
+
+    Args:
+        func: The function to wrap
+
+    Returns:
+        A function that will format missing entries in a SEER row
+    """
 
     def remove_blank(*args,**kwargs):
+        """Converts SEER missing data with the ARFF missing data sentinel.
+
+        Returns:
+            The ARFF missing data sentinel value.
+        """
         value = func(*args,**kwargs)
         if ' ' in value:
             value = '?'
@@ -16,8 +32,29 @@ def format_blank(func):
 
 class SeerAttribute(object):
 
+    """Encapsulate a SEER column (attribute) into this class.  This class is a
+    generic SeerAttribute and derived classes, perhaps with specific data
+    transformations, are encouraged.
+
+    Attributes:
+        start: integer indicating the start of the SEER attribute.
+        length: integer number of characters for this attribute
+        name: string representing the unique name of this attribute
+        datatype: The ARFF datatype (numeric, nominal, date, or string)
+    """
+
     def __init__(self, start, length, name, datatype="numeric"):
-        self.start = start - 1 #oncologist starting counting at 1
+        """Init the class with the definitions from the SEER data dictionary.
+
+        Args:
+            start: int start position of the attribute (as described by the
+                SEER data dictionary)
+            length: the length of the attribute
+            name: the string representing the attribute name
+            datatype: string representing the ARFF datatype
+        """
+
+        self.start = start - 1 #oncologists starting counting at 1
         self.length = length
         self.name = name
         self.datatype = datatype
@@ -25,10 +62,25 @@ class SeerAttribute(object):
 
     @property
     def end(self):
+        """A convenient property to store the end of the attribute
+        Returns:
+            An integer end of the attribute.
+        """
+
         return self.start + self.length
 
     def _get_repr(self):
-        return "(%d,%d,%s,%s)" % (self.start, self.length, self.name, self.datatype)
+
+        """Utility function to return the common attributes of the class in a
+        consistent manner.  Useful when building the repr string.
+
+        Returns:
+            The parenthesis part of the repr string, which *should* be common
+            to the class hierarchy.
+        """
+        return "(%d,%d,%s,%s)" % (self.start, self.length, self.name,
+            self.datatype)
+
 
     def __repr__(self):
         return "SeerAttribute" + self._get_repr()
@@ -37,17 +89,52 @@ class SeerAttribute(object):
         return self.name
 
     def _get_from_seer(self, seer_string):
+        """Slices out this classes attribute from the SEER row.
+
+        Args:
+            seer_string: String representing one row in the SEER database.
+
+        Returns:
+            The SEER encoded value specific for this attribute.
+        """
         return seer_string[self.start:self.end]
 
-    def get_attribute_string(self):
+    def get_meta_string(self):
+
+        """Get the ARFF string describing this attribute.  This string must
+        precede data in ARFF files.
+
+        Returns:
+            The ARFF attribute description string.
+        """
         return "@attribute %s %s" % (self.name, self.datatype)
 
     @format_blank
-    def toArff(self, seer_string):
+    def get_attribute(self, seer_string):
+        """Retrieves the attribute value from the SEER row.  This method should
+            be overridden by derived classes if custom data manipulation is
+            required during seer2arff conversion.
+
+        Args:
+            seer_string: String representing the encoded SEER row.
+
+        Returns:
+            A string representing this attributes SEER value.
+        """
         return self._get_from_seer(seer_string)
 
 
     def is_match(self, seer_string, match):
+        """Utility method to test if the match parameter matches this
+        attribute's value from the SEER row.
+
+        Args:
+            seer_string: String representing the SEER encoded row.
+            match: String representing the string to match against.
+
+        Returns:
+            True if match equals the attributes value, False otherwise.
+        """
         value = self._get_from_seer(seer_string)
 
         if value == match:
@@ -56,8 +143,27 @@ class SeerAttribute(object):
             return False
 
 class SurvivalTimeRecode(SeerAttribute):
+    """Derived SeerAttribute that encapsulates the Survival Time Recode.
+
+    STR is defined as (from the SEER data dictionary): The Survival Time Recode
+    is calculated using the date of diagnosis and one of the following: date of
+    death, date last known to be alive, or follow-up cutoff date used for this
+    file (see title page for date for this file). Thus a person diagnosed in
+    May 1976 and who died in May 1980 has a Survival Time Recode of 04 years
+    and 00 months.
+    """
 
     def _to_months(self, seer_string):
+        """Converts the STR to pure months instead of the YYMM format.
+
+        Args:
+            seer_string: String representing the SEER row
+
+        Returns:
+            String, meeting the following regexp: [0-9]+
+            So, this could possibly not be 4 characters, which is ok since the
+            ARFF format is flexible on fixed data strings.
+        """
         val = self._get_from_seer(seer_string)
         if "9999" in val or ' ' in val:
             return "?"
@@ -71,7 +177,7 @@ class SurvivalTimeRecode(SeerAttribute):
             print converted
             return converted
 
-    def toArff(self, seer_string):
+    def get_attribute(self, seer_string):
         return self._to_months(seer_string)
 
     def __repr__(self):
@@ -79,9 +185,10 @@ class SurvivalTimeRecode(SeerAttribute):
 
 class VitalStatusRecode(SeerAttribute):
 
-    DEAD_CODE = '4'
-
     def is_dead(self, seer_string):
+
+        DEAD_CODE = '4'
+
         val = self._get_from_seer(seer_string)
 
         return self.is_match(val, DEAD_CODE)
@@ -91,9 +198,9 @@ class VitalStatusRecode(SeerAttribute):
 
 class CauseSpecificDeathClassification(SeerAttribute):
 
-    DEAD_OF_CANCER = "1"
-
     def is_dead_from_cancer(self, seer_string):
+        DEAD_OF_CANCER = "1"
+
         val = self._get_from_seer(seer_string)
 
         return self.is_match(val, DEAD_OF_CANCER)
@@ -109,7 +216,7 @@ class AJCCStage3rdEdition(SeerAttribute):
 def convert_seer_to_arff(types_list, seer_string):
     output = ""
     for t in types_list:
-        output = output + t.toArff(seer_string) + ","
+        output = output + t.get_attribute(seer_string) + ","
 
     #Remove trailing comma
     output = output[:len(output)-1]
