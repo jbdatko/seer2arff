@@ -1,251 +1,193 @@
-import json
-from os import listdir
-from os.path import isfile, join
-from collections import namedtuple
-
-ATTRIBUTE = "@attribute"
-NUMERIC_TYPE = "numeric"
-STRING_TYPE = "string"
-NOMINAL_TYPE = "nominal"
-FILES_DIR = "/Users/jdatko/cs610/seer2arff/json_fields/"
-OUTPUT = "output.arff"
-
-Seer_Functor = namedtuple('Seer_Functor', ['attribute', 'convert'])
-
-def build_attribute_function(attribute, datatype):
-    """Returns a function that will return the ARFF attribute string when
-    called"""
-
-    def get_arff_attribute():
-        """Returns the ARFF formatted attribute string declaration"""
-
-        attrib = []
-        attrib.append(ATTRIBUTE)
-        attrib.append(" ")
-        attrib.append(attribute)
-        attrib.append(" ")
-        attrib.append(datatype())
-        return "".join(attrib)
-
-    return get_arff_attribute
-
-def build_converter(start, length, translator):
-    """Given the start postion, length and a translator function specific to
-    this data format, return a function that will convert the SEER encoded row
-    to the ARFF format as specified by the translator function"""
-
-    def convert(row):
-        """Convert the encoded data starting at start, which is length long,
-        according to the supplied translator."""
-
-        s = start - 1
-        e = s + length
-        return translator(row[s:e])
-
-    return convert
-
-def translate_string(obj):
-    return str(obj[1:-1])
-
-def build_dict2attribute(target):
-    """Returns a function that will produce the ARFF attribute string for a
-    nominal type for the target dictionary"""
-
-    def dict2attribute():
-        result = []
-        result.append('{')
-        for k in target.values():
-            result.append(k)
-            result.append(',')
-
-        del result[len(result) - 1]
-        result.append('}')
-        return "".join(result)
-
-    return dict2attribute
-
-def get_dict_translator(mapping):
-
-    def translate_dict(raw):
-        return mapping[raw]
-
-    return translate_dict
-
-
-def get_datatype(arff_type, nominal=None):
-
-    if NUMERIC_TYPE in arff_type:
-        return lambda : NUMERIC_TYPE
-    elif STRING_TYPE in arff_type:
-        return lambda : STRING_TYPE
-    elif NOMINAL_TYPE in arff_type:
-        return build_dict2attribute(nominal)
-    else:
-        return None
-
-def get_translator(arff_type, codes=None):
-    if NOMINAL_TYPE in arff_type:
-        return get_dict_translator(codes)
-    else:
-        return lambda x: x
-
-def json2func(json_data):
-    """Given the json data file, return a pair of functions to (1) produce the
-    ARFF attribute string and (2) convert the SEER row into the ARFF row"""
-
-    datatype = json_data['datatype']
-    codes = None
-
-    print datatype
-    print codes
-
-    create_attribute = build_attribute_function(json_data['name'],
-                                                get_datatype(datatype, codes))
-
-    converter = build_converter(json_data['start'], json_data['length'],
-                                get_translator(datatype, codes))
-
-    return create_attribute, converter
-
-
-
-def _get_value(l, start, length):
-    s = start - 1
-    return l[s:s+length]
-
-def get_c(file, start, length):
-    for l in file:
-        value = _get_value(l, start, length)
-
-        if ' ' in value:
-            pass
-        else:
-            print value
-
-def is_stage_iv(l):
-    stage = _get_value(l,236, 1)
-    if ' ' in stage:
-        return False
-
-    s = int(stage)
-    if s == 4:
-        return True
-    else:
-        return False
-
-def is_dead(l):
-    dead = _get_value(l,265,1)
-    if ' ' in dead:
-        return False
-
-    s = int(dead)
-    if 4 == s:
-        return True
-    else:
-        return False
-
-def is_dead_from_cancer(l):
-    dead = _get_value(l,272,1)
-    if ' ' in dead:
-        return False
-
-    s = int(dead)
-    if 1 == s:
-        return True
-    else:
-        return False
-
-def breast_filter(row):
-    if is_stage_iv(row) and is_dead(row) and is_dead_from_cancer(row):
-        return row
-    else:
-        return None
-
-def count_stage_4(file):
-    num = 0
-    for l in file:
-        if is_stage_iv(l) and is_dead(l) and is_dead_from_cancer(l):
-            num = num + 1
-        else:
-            pass
-
-    return num
-
-
-
-
-
-# marital = { '1' : 'Single', '2' : 'Married', '3' : 'Seperated', '4':'Divorced',
-# '5':'Widowed', '6':'Unmarried', '9':'Unkown'}
-
-# married_attrib = build_attribute_function("marital",
-#     build_dict2attribute(marital))
-# married_converter = build_converter(19, 1, get_dict_translator(marital))
-
-
-# json_data = open("marital_status_at_dx.json")
-# m = json.load(json_data)
-
-# a, b = json2func(m)
+import os
+import re
 
 breast = "/Users/jdatko/cs610/SEER_1973_2009_TEXTDATA/incidence/yr1973_2009.seer9/BREAST.txt"
 
-records = open(breast)
+def format_blank(func):
 
-#Grab all files in the FILES_DIR directory
-files = [ f for f in listdir(FILES_DIR) if isfile(join(FILES_DIR,f)) ]
-files = [ FILES_DIR + f for f in files]
+    def remove_blank(*args,**kwargs):
+        value = func(*args,**kwargs)
+        if ' ' in value:
+            value = '?'
 
-open_files = [open(o) for o in files ]
+        return value
 
-jsons = [json.load(j) for j in open_files]
+    return remove_blank
 
-def convert_survival(row):
-    val = row[250:254]
-    if "9999" in val or ' ' in val:
-        return "?"
-    else:
-        print "orignal: " + val
-        years = int(val[0:2])
-        months = int(val[2:4])
+class SeerAttribute(object):
 
-        time = years * 12 + months
-        converted = str(time)
-        print converted
-        return converted
+    def __init__(self, start, length, name, datatype="numeric"):
+        self.start = start - 1 #oncologist starting counting at 1
+        self.length = length
+        self.name = name
+        self.datatype = datatype
 
-def create_functor(json_data):
-    attribute, convert = json2func(json_data)
-    if "survival-time-recode" in json_data['name']:
-        print "found survival time"
-        return Seer_Functor(attribute, convert_survival)
 
-    return Seer_Functor(attribute, convert)
+    @property
+    def end(self):
+        return self.start + self.length
 
-functors = [create_functor(j) for j in jsons]
+    def _get_repr(self):
+        return "(%d,%d,%s,%s)" % (self.start, self.length, self.name, self.datatype)
 
-out = open(OUTPUT, 'w+')
+    def __repr__(self):
+        return "SeerAttribute" + self._get_repr()
 
-out.write("@relation breast")
-out.write("\n")
+    def __string__(self):
+        return self.name
 
-for f in functors:
-    out.write(f.attribute())
-    out.write("\n")
+    def _get_from_seer(self, seer_string):
+        return seer_string[self.start:self.end]
 
-out.write("@data")
-out.write("\n")
+    def get_attribute_string(self):
+        return "@attribute %s %s" % (self.name, self.datatype)
 
-for line in records:
-    if breast_filter(line):
-        output = ""
-        for f in functors:
-            value = f.convert(line)
-            if ' ' in value:
-                value = '?'
-            output = output + value + ","
-        output = output[:len(output)-1]
-        out.write(output)
-        out.write("\n")
+    @format_blank
+    def toArff(self, seer_string):
+        return self._get_from_seer(seer_string)
 
-out.close()
+
+    def is_match(self, seer_string, match):
+        value = self._get_from_seer(seer_string)
+
+        if value == match:
+            return True
+        else:
+            return False
+
+class SurvivalTimeRecode(SeerAttribute):
+
+    def _to_months(self, seer_string):
+        val = self._get_from_seer(seer_string)
+        if "9999" in val or ' ' in val:
+            return "?"
+        else:
+            print "orignal: " + val
+            years = int(val[0:2])
+            months = int(val[2:4])
+
+            time = years * 12 + months
+            converted = str(time)
+            print converted
+            return converted
+
+    def toArff(self, seer_string):
+        return self._to_months(seer_string)
+
+    def __repr__(self):
+        return "SurvivalTimeRecode" + self._get_repr()
+
+class VitalStatusRecode(SeerAttribute):
+
+    DEAD_CODE = '4'
+
+    def is_dead(self, seer_string):
+        val = self._get_from_seer(seer_string)
+
+        return self.is_match(val, DEAD_CODE)
+
+    def __repr__(self):
+        return "VitalStatusRecode" + self._get_repr()
+
+class CauseSpecificDeathClassification(SeerAttribute):
+
+    DEAD_OF_CANCER = "1"
+
+    def is_dead_from_cancer(self, seer_string):
+        val = self._get_from_seer(seer_string)
+
+        return self.is_match(val, DEAD_OF_CANCER)
+
+class AJCCStage3rdEdition(SeerAttribute):
+
+    def is_stage_iv(self, seer_string):
+        stage4 = '^4\d$'
+        val = self._get_from_seer(seer_string)
+
+        return re.search(stage4, val)
+
+def convert_seer_to_arff(types_list, seer_string):
+    output = ""
+    for t in types_list:
+        output = output + t.toArff(seer_string) + ","
+
+    #Remove trailing comma
+    output = output[:len(output)-1]
+    return output
+
+def count_matches(seer_file, query):
+    count = 0
+    with open(seer_file) as seer:
+        for line in seer:
+            if query(line):
+                count = count + 1
+
+    return count
+
+
+def load_seer_types():
+
+    seer_types = dict()
+
+    seer_types['marital-status-at-dx'] = SeerAttribute(1, 8, 'marital-status-at-dx')
+    seer_types['sex'] = SeerAttribute(24, 1, 'sex')
+    seer_types['age-at-dx'] = SeerAttribute(25, 3, 'age-at-dx')
+    seer_types['birth-place'] = SeerAttribute(32, 3, 'birth-place')
+    seer_types['sequence-number-central'] = SeerAttribute(35, 2, 'sequence-number-central')
+    seer_types['year-of-dx'] = SeerAttribute(39, 4, 'year-of-dx')
+    seer_types['primary-site'] = SeerAttribute(43, 4, 'primary-site')
+    seer_types['laterality'] = SeerAttribute(47, 1, 'laterality')
+    seer_types['histology'] = SeerAttribute(48, 4, 'histology')
+    seer_types['histologic-type'] = SeerAttribute(53, 4, 'histologic-type')
+    seer_types['grade'] = SeerAttribute(58, 1, 'grade')
+    seer_types['dx-confirmation'] = SeerAttribute(59, 1, 'dx-confirmation')
+    seer_types['eod-tumor-size'] = SeerAttribute(61, 3, 'eod-tumor-size')
+    seer_types['eod-extension'] = SeerAttribute(64, 2, 'eod-extension')
+    seer_types['eod-lymph-node-involv'] = SeerAttribute(68, 1, 'eod-lymph-node-involv')
+    seer_types['regional-nodes-positive'] = SeerAttribute(69, 2, 'regional-nodes-positive')
+    seer_types['regional-nodes-examined'] = SeerAttribute(71, 2, 'regional-nodes-examined')
+    seer_types['tumor-marker-1'] = SeerAttribute(93, 1, 'tumor-marker-1')
+    seer_types['tumor-marker-2'] = SeerAttribute(94, 1, 'tumor-marker-2')
+    seer_types['cs-tumor-size'] = SeerAttribute(96, 3, 'cs-tumor-size')
+    seer_types['cs-extension'] = SeerAttribute(99, 3, 'cs-extension')
+    seer_types['cs-lymph-nodes'] = SeerAttribute(102, 3, 'cs-lymph-nodes')
+    seer_types['cs-mets-at-dx'] = SeerAttribute(105, 2, 'cs-mets-at-dx')
+    seer_types['cs-site-specific-factor-1'] = SeerAttribute(107, 3, 'cs-site-specific-factor-1')
+    seer_types['cs-site-specific-factor-2'] = SeerAttribute(110, 3, 'cs-site-specific-factor-2')
+    seer_types['cs-site-specific-factor-3'] = SeerAttribute(113, 3, 'cs-site-specific-factor-3')
+    seer_types['cs-site-specific-factor-4'] = SeerAttribute(116, 3, 'cs-site-specific-factor-4')
+    seer_types['cs-site-specific-factor-5'] = SeerAttribute(119, 3, 'cs-site-specific-factor-5')
+    seer_types['cs-site-specific-factor-6'] = SeerAttribute(122, 3, 'cs-site-specific-factor-6')
+    seer_types['derived-ajcc-t'] = SeerAttribute(128, 2, 'derived-ajcc-t')
+    seer_types['derived-ajcc-n'] = SeerAttribute(130, 2, 'derived-ajcc-n')
+    seer_types['derived-ajcc-m'] = SeerAttribute(132, 2, 'derived-ajcc-m')
+    seer_types['rx-summ-surg-prim-site'] = SeerAttribute(159, 2, 'rx-summ-surg-prim-site')
+    seer_types['rx-summ-scope-reg-ln-sur'] = SeerAttribute(161, 1, 'rx-summ-scope-reg-ln-sur')
+    seer_types['rx-summ-surg-oth-reg-dis'] = SeerAttribute(162, 1, 'rx-summ-surg-oth-reg-dis')
+    seer_types['rx-summ-reg-ln-examined'] = SeerAttribute(163, 2, 'rx-summ-reg-ln-examined')
+    seer_types['rx-summ-reconstruct-1'] = SeerAttribute(165, 1, 'rx-summ-reconstruct-1')
+    seer_types['reason-for-no-surgery'] = SeerAttribute(166, 1, 'reason-for-no-surgery')
+    seer_types['rx-summ-radiation'] = SeerAttribute(167, 1, 'rx-summ-radiation')
+    seer_types['rx-summ-surg-rad-seq'] = SeerAttribute(169, 1, 'rx-summ-surg-rad-seq')
+    seer_types['rx-summ-surg-site-98-02'] = SeerAttribute(172, 2, 'rx-summ-surg-site-98-02')
+    seer_types['seer-record-number'] = SeerAttribute(176, 2, 'seer-record-number')
+    seer_types['race-recode'] = SeerAttribute(234, 1, 'race-recode')
+    seer_types['origin-recode'] = SeerAttribute(235, 1, 'origin-recode')
+    seer_types['seer-historic-stage-a'] = SeerAttribute(236, 1, 'seer-historic-stage-a')
+    seer_types['number-of-primaries'] = SeerAttribute(243, 2, 'number-of-primaries')
+    seer_types['first-malignant-primary-indicator'] = SeerAttribute(245, 1, 'first-malignant-primary-indicator')
+    seer_types['survival-time-recode'] = SurvivalTimeRecode(251, 4, 'survival-time-recode')
+    seer_types['vital-status-recode'] = VitalStatusRecode(265, 1, 'vital-status-recode')
+    seer_types['seer-cause-specific-death-classification'] = SeerAttribute(272, 1, 'seer-cause-specific-death-classification')
+    seer_types['er-status-recode-breast-cancer'] = SeerAttribute(278, 1, 'er-status-recode-breast-cancer')
+    seer_types['pr-status-recode-breast-cancer'] = SeerAttribute(279, 1, 'pr-status-recode-breast-cancer')
+    seer_types['cs-site-specific-factor-8'] = SeerAttribute(282, 3, 'cs-site-specific-factor-8')
+    seer_types['cs-site-specific-factor-10'] = SeerAttribute(285, 3, 'cs-site-specific-factor-10')
+    seer_types['cs-site-specific-factor-11'] = SeerAttribute(288, 3, 'cs-site-specific-factor-11')
+    seer_types['cs-site-specific-factor-15'] = SeerAttribute(294, 3, 'cs-site-specific-factor-15')
+    seer_types['cs-site-specific-factor-16'] = SeerAttribute(297, 3, 'cs-site-specific-factor-16')
+    seer_types['lymph-vascular-invasion'] = SeerAttribute(300, 1, 'lymph-vascular-invasion')
+    seer_types['ajcc-stage-3rd-edition'] = AJCCStage3rdEdition(237, 2, 'ajcc-stage-3rd-edition')
+    return seer_types
+
+d = load_seer_types()
