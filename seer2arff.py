@@ -231,12 +231,36 @@ def count_matches(seer_file, query):
 
     return count
 
+def get_truth_combinator(func_list):
+    """Return an is_all_true function that closes over func_list
+
+    Args:
+        A list of functions that return True or False when passed in the SEER
+        row.
+
+    Returns:
+        A function that contains the func_list as a closure.
+    """
+    def is_all_true(seer_string):
+        """Evaluates all functions over the SEER string.
+
+        Args:
+            String representing the SEER row.
+
+        Returns:
+            True if all functions return True when passed the SEER string,
+            otherwise False.
+        """
+        results = [f(seer_string) for f in func_list]
+        return reduce(lambda x, y: x and y, results, True)
+
+    return is_all_true
 
 def load_seer_types():
 
     seer_types = dict()
 
-    seer_types['marital-status-at-dx'] = SeerAttribute(1, 8, 'marital-status-at-dx')
+    seer_types['marital-status-at-dx'] = SeerAttribute(19, 1, 'marital-status-at-dx')
     seer_types['sex'] = SeerAttribute(24, 1, 'sex')
     seer_types['age-at-dx'] = SeerAttribute(25, 3, 'age-at-dx')
     seer_types['birth-place'] = SeerAttribute(32, 3, 'birth-place')
@@ -256,11 +280,8 @@ def load_seer_types():
     seer_types['tumor-marker-1'] = SeerAttribute(93, 1, 'tumor-marker-1')
     seer_types['tumor-marker-2'] = SeerAttribute(94, 1, 'tumor-marker-2')
     seer_types['cs-tumor-size'] = SeerAttribute(96, 3, 'cs-tumor-size')
-    seer_types['cs-extension'] = SeerAttribute(99, 3, 'cs-extension')
-    seer_types['cs-lymph-nodes'] = SeerAttribute(102, 3, 'cs-lymph-nodes')
+    #http://web2.facs.org/cstage0204/breast/Breast_hau.html
     seer_types['cs-mets-at-dx'] = SeerAttribute(105, 2, 'cs-mets-at-dx')
-    seer_types['cs-site-specific-factor-1'] = SeerAttribute(107, 3, 'cs-site-specific-factor-1')
-    seer_types['cs-site-specific-factor-2'] = SeerAttribute(110, 3, 'cs-site-specific-factor-2')
     seer_types['cs-site-specific-factor-3'] = SeerAttribute(113, 3, 'cs-site-specific-factor-3')
     seer_types['cs-site-specific-factor-4'] = SeerAttribute(116, 3, 'cs-site-specific-factor-4')
     seer_types['cs-site-specific-factor-5'] = SeerAttribute(119, 3, 'cs-site-specific-factor-5')
