@@ -12,6 +12,22 @@ log = logging.getLogger('seer2arff')
 breast = "/Users/jdatko/cs610/SEER_1973_2009_TEXTDATA/incidence/yr1973_2009.seer9/BREAST.txt"
 
 
+def nines_to_question_mark(value):
+    """Most of the SEER attributes use all nines to indicate missing or unkown
+    data.  The ARFF format is to represent this data as a question mark.
+
+    Args:
+        String representing the SEER value
+
+    Returns:
+        The orignal value or a question mark if the value was all nines
+    """
+
+    if re.search('^9+$', value):
+        return '?'
+    else:
+        return value
+
 def format_blank(func):
     """Returns a function that will format blanks in the SEER data.  Useful as
     a decorator.
@@ -127,7 +143,8 @@ class SeerAttribute(object):
         Returns:
             A string representing this attributes SEER value.
         """
-        return self._get_from_seer(seer_string)
+        val = self._get_from_seer(seer_string)
+        return nines_to_question_mark(val)
 
     def is_match(self, seer_string, match):
         """Utility method to test if the match parameter matches this
@@ -146,6 +163,33 @@ class SeerAttribute(object):
             return True
         else:
             return False
+
+
+class SeerNominalAttribute(SeerAttribute):
+
+    def get_meta_string(self):
+        return "@attribute %s %s" % (self.name, self.datatype)
+
+    # def get_attribute(self, seer_string):
+    #     val = super(SeerNominalAttribute,self).get_attribute(seer_string)
+    #     return nines_to_question_mark(val)
+
+    def __repr__(self):
+        return "SeerNominalAttribute" + self._get_repr()
+
+class ErPrStatusRecord(SeerNominalAttribute):
+
+    def get_attribute(self, seer_string):
+
+        value = super(SeerNominalAttribute,self).get_attribute(seer_string)
+
+        if re.search('^4$', value):
+            return '?'
+        else:
+            return value
+
+    def __repr__(self):
+        return "ErPrStatusRecord" + self._get_repr()
 
 
 class SurvivalTimeRecode(SeerAttribute):
@@ -309,67 +353,71 @@ def load_seer_types():
 
     attribs = dict()
 
-    builder(attribs, SeerAttribute, 'marital-status-at-dx', 19, 1)
-    builder(attribs, SeerAttribute, 'sex', 24, 1)
+    builder(attribs, SeerNominalAttribute, 'marital-status-at-dx', 19, 1,
+            '{1,2,3,4,5,6,9}')
+    builder(attribs, SeerNominalAttribute, 'sex', 24, 1, '{1,2}')
     builder(attribs, SeerAttribute, 'age-at-dx', 25, 3)
-    builder(attribs, SeerAttribute, 'birth-place', 32, 3)
-    builder(attribs, SeerAttribute, 'sequence-number-central', 35, 2)
+    #builder(attribs, SeerAttribute, 'birth-place', 32, 3)
+    #builder(attribs, SeerAttribute, 'sequence-number-central', 35, 2)
     builder(attribs, SeerAttribute, 'year-of-dx', 39, 4)
-    builder(attribs, SeerAttribute, 'primary-site', 43, 4, 'string')
-    builder(attribs, SeerAttribute, 'laterality', 47, 1)
-    builder(attribs, SeerAttribute, 'histology', 48, 4)
-    builder(attribs, SeerAttribute, 'histologic-type', 53, 4)
-    builder(attribs, SeerAttribute, 'grade', 58, 1)
-    builder(attribs, SeerAttribute, 'dx-confirmation', 59, 1)
+    #builder(attribs, SeerAttribute, 'primary-site', 43, 4, 'string')
+    #builder(attribs, SeerAttribute, 'laterality', 47, 1)
+    #builder(attribs, SeerAttribute, 'histology', 48, 4)
+    #builder(attribs, SeerAttribute, 'histologic-type', 53, 4)
+    builder(attribs, SeerNominalAttribute, 'grade', 58, 1, '{1,2,3,4,5,6,7,8,9}')
+    #builder(attribs, SeerAttribute, 'dx-confirmation', 59, 1)
     builder(attribs, SeerAttribute, 'eod-tumor-size', 61, 3)
-    builder(attribs, SeerAttribute, 'eod-extension', 64, 2)
-    builder(attribs, SeerAttribute, 'eod-lymph-node-involv', 68, 1)
-    builder(attribs, SeerAttribute, 'regional-nodes-positive', 69, 2)
-    builder(attribs, SeerAttribute, 'regional-nodes-examined', 71, 2)
-    builder(attribs, SeerAttribute, 'tumor-marker-1', 93, 1)
-    builder(attribs, SeerAttribute, 'tumor-marker-2', 94, 1)
-    builder(attribs, SeerAttribute, 'cs-tumor-size', 96, 3)
-    builder(attribs, SeerAttribute, 'cs-extension', 99, 3)
-    builder(attribs, SeerAttribute, 'cs-lymph-nodes', 102, 3)
-    builder(attribs, SeerAttribute, 'cs-mets-at-dx', 105, 2)
-    builder(attribs, SeerAttribute, 'cs-site-specific-factor-1', 107, 3)
-    builder(attribs, SeerAttribute, 'cs-site-specific-factor-2', 110, 3)
-    builder(attribs, SeerAttribute, 'cs-site-specific-factor-3', 113, 3)
-    builder(attribs, SeerAttribute, 'cs-site-specific-factor-4', 116, 3)
-    builder(attribs, SeerAttribute, 'cs-site-specific-factor-5', 119, 3)
-    builder(attribs, SeerAttribute, 'cs-site-specific-factor-6', 122, 3)
-    builder(attribs, SeerAttribute, 'derived-ajcc-t', 128, 2)
-    builder(attribs, SeerAttribute, 'derived-ajcc-n', 130, 2)
-    builder(attribs, SeerAttribute, 'derived-ajcc-m', 132, 2)
-    builder(attribs, SeerAttribute, 'rx-summ-surg-prim-site', 159, 2)
-    builder(attribs, SeerAttribute, 'rx-summ-scope-reg-ln-sur', 161, 1)
-    builder(attribs, SeerAttribute, 'rx-summ-surg-oth-reg-dis', 162, 1)
-    builder(attribs, SeerAttribute, 'rx-summ-reg-ln-examined', 163, 2)
-    builder(attribs, SeerAttribute, 'rx-summ-reconstruct-1', 165, 1)
-    builder(attribs, SeerAttribute, 'reason-for-no-surgery', 166, 1)
-    builder(attribs, SeerAttribute, 'rx-summ-radiation', 167, 1)
-    builder(attribs, SeerAttribute, 'rx-summ-surg-rad-seq', 169, 1)
-    builder(attribs, SeerAttribute, 'rx-summ-surg-site-98-02', 172, 2)
-    builder(attribs, SeerAttribute, 'seer-record-number', 176, 2)
-    builder(attribs, SeerAttribute, 'race-recode', 234, 1)
-    builder(attribs, SeerAttribute, 'origin-recode', 235, 1)
-    builder(attribs, SeerAttribute, 'seer-historic-stage-a', 236, 1)
-    builder(attribs, SeerAttribute, 'number-of-primaries', 243, 2)
-    builder(attribs, SeerAttribute, 'first-malignant-primary-indicator',
-            245, 1)
+    #builder(attribs, SeerAttribute, 'eod-extension', 64, 2)
+    builder(attribs, SeerNominalAttribute, 'eod-lymph-node-involv', 68, 1, '{0,1,2,3,4,5,6,7,8,9}')
+    #builder(attribs, SeerAttribute, 'regional-nodes-positive', 69, 2)
+    #builder(attribs, SeerAttribute, 'regional-nodes-examined', 71, 2)
+    builder(attribs, SeerNominalAttribute, 'tumor-marker-1', 93, 1, '{0,1,2,3,8,9}')
+    builder(attribs, SeerNominalAttribute, 'tumor-marker-2', 94, 1, '{0,1,2,3,8,9}')
+    #builder(attribs, SeerAttribute, 'cs-tumor-size', 96, 3)
+    #builder(attribs, SeerAttribute, 'cs-extension', 99, 3)
+    #builder(attribs, SeerAttribute, 'cs-lymph-nodes', 102, 3)
+    #builder(attribs, SeerAttribute, 'cs-mets-at-dx', 105, 2)
+    #builder(attribs, SeerAttribute, 'cs-site-specific-factor-1', 107, 3)
+    #builder(attribs, SeerAttribute, 'cs-site-specific-factor-2', 110, 3)
+    #builder(attribs, SeerAttribute, 'cs-site-specific-factor-3', 113, 3)
+    #builder(attribs, SeerAttribute, 'cs-site-specific-factor-4', 116, 3)
+    #builder(attribs, SeerAttribute, 'cs-site-specific-factor-5', 119, 3)
+    #builder(attribs, SeerAttribute, 'cs-site-specific-factor-6', 122, 3)
+    #builder(attribs, SeerAttribute, 'derived-ajcc-t', 128, 2)
+    #builder(attribs, SeerAttribute, 'derived-ajcc-n', 130, 2)
+    #builder(attribs, SeerAttribute, 'derived-ajcc-m', 132, 2)
+    #builder(attribs, SeerAttribute, 'rx-summ-surg-prim-site', 159, 2)
+    #builder(attribs, SeerAttribute, 'rx-summ-scope-reg-ln-sur', 161, 1)
+    #builder(attribs, SeerAttribute, 'rx-summ-surg-oth-reg-dis', 162, 1)
+    #builder(attribs, SeerAttribute, 'rx-summ-reg-ln-examined', 163, 2)
+    #builder(attribs, SeerAttribute, 'rx-summ-reconstruct-1', 165, 1)
+    builder(attribs, SeerNominalAttribute, 'reason-for-no-surgery', 166, 1, '{0,1,2,5,6,7,8,9}')
+    #builder(attribs, SeerAttribute, 'rx-summ-radiation', 167, 1)
+    #builder(attribs, SeerAttribute, 'rx-summ-surg-rad-seq', 169, 1)
+    #builder(attribs, SeerAttribute, 'rx-summ-surg-site-98-02', 172, 2)
+    #builder(attribs, SeerAttribute, 'seer-record-number', 176, 2)
+    builder(attribs, SeerNominalAttribute, 'race-recode', 234, 1, '{1,2,3,4,7,9}')
+    #builder(attribs, SeerAttribute, 'origin-recode', 235, 1)
+    #builder(attribs, SeerAttribute, 'seer-historic-stage-a', 236, 1)
+    #builder(attribs, SeerAttribute, 'number-of-primaries', 243, 2)
+    #builder(attribs, SeerAttribute, 'first-malignant-primary-indicator',
+    #        245, 1)
     builder(attribs, SurvivalTimeRecode, 'survival-time-recode', 251, 4)
     builder(attribs, VitalStatusRecode, 'vital-status-recode', 265, 1)
     builder(attribs, CauseSpecificDeathClassification,
             'seer-cause-specific-death-classification', 272, 1)
-    builder(attribs, SeerAttribute, 'er-status-recode-breast-cancer', 278, 1)
-    builder(attribs, SeerAttribute, 'pr-status-recode-breast-cancer', 279, 1)
-    builder(attribs, SeerAttribute, 'cs-site-specific-factor-8', 282, 3)
-    builder(attribs, SeerAttribute, 'cs-site-specific-factor-10', 285, 3)
-    builder(attribs, SeerAttribute, 'cs-site-specific-factor-11', 288, 3)
-    builder(attribs, SeerAttribute, 'cs-site-specific-factor-15', 294, 3)
-    builder(attribs, SeerAttribute, 'cs-site-specific-factor-16', 297, 3)
-    builder(attribs, SeerAttribute, 'lymph-vascular-invasion', 300, 1)
+    builder(attribs, ErPrStatusRecord, 'er-status-recode-breast-cancer', 278,
+            1, '{1,2,3,4,9}')
+    builder(attribs, ErPrStatusRecord, 'pr-status-recode-breast-cancer', 279,
+            1, '{1,2,3,4,9}')
+    #builder(attribs, SeerAttribute, 'cs-site-specific-factor-8', 282, 3)
+    #builder(attribs, SeerAttribute, 'cs-site-specific-factor-10', 285, 3)
+    #builder(attribs, SeerAttribute, 'cs-site-specific-factor-11', 288, 3)
+    #builder(attribs, SeerAttribute, 'cs-site-specific-factor-15', 294, 3)
+    #builder(attribs, SeerAttribute, 'cs-site-specific-factor-16', 297, 3)
+    #builder(attribs, SeerAttribute, 'lymph-vascular-invasion', 300, 1)
     builder(attribs, AJCCStage3rdEdition, 'ajcc-stage-3rd-edition', 237, 2)
+    #builder(attribs, SeerAttribute, 'rx-summ-rad-2-cns', 168, 1)
 
     return attribs
 
@@ -425,3 +473,15 @@ def to_arff(attribs, seer_file, output, filters=None):
 filters = [d['ajcc-stage-3rd-edition'].is_stage_iv,
            d['seer-cause-specific-death-classification'].is_dead_from_cancer,
            d['vital-status-recode'].is_dead]
+
+if __name__=="__main__":
+    import optparse
+
+    parser = optparse.OptionParser()
+
+    #parse the command line
+    opts, args = parser.parse_args()
+
+    output_file = args[0]
+
+    to_arff(d, breast, output_file, get_truth_combinator(filters))
