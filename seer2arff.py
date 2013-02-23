@@ -1,13 +1,20 @@
 import os
 import re
+import logging
 
-breast =
-"/Users/jdatko/cs610/SEER_1973_2009_TEXTDATA/incidence/yr1973_2009.seer9/BREAST.txt"
+logging.basicConfig(
+    format = "%(levelname) -4s %(asctime)s %(message)s",
+    level = logging.INFO
+    )
+
+log = logging.getLogger('seer2arff')
+
+breast = "/Users/jdatko/cs610/SEER_1973_2009_TEXTDATA/incidence/yr1973_2009.seer9/BREAST.txt"
 
 
 def format_blank(func):
-    """Returns a function that will format blanks in the SEER data.  Useful as a
-    decorator.
+    """Returns a function that will format blanks in the SEER data.  Useful as
+    a decorator.
 
     Args:
         func: The function to wrap
@@ -16,19 +23,20 @@ def format_blank(func):
         A function that will format missing entries in a SEER row
     """
 
-    def remove_blank(*args,**kwargs):
+    def remove_blank(*args, **kwargs):
         """Converts SEER missing data with the ARFF missing data sentinel.
 
         Returns:
             The ARFF missing data sentinel value.
         """
-        value = func(*args,**kwargs)
+        value = func(*args, **kwargs)
         if ' ' in value:
             value = '?'
 
         return value
 
     return remove_blank
+
 
 class SeerAttribute(object):
 
@@ -54,11 +62,10 @@ class SeerAttribute(object):
             datatype: string representing the ARFF datatype
         """
 
-        self.start = start - 1 #oncologists starting counting at 1
+        self.start = start - 1  # oncologists starting counting at 1
         self.length = length
         self.name = name
         self.datatype = datatype
-
 
     @property
     def end(self):
@@ -79,8 +86,7 @@ class SeerAttribute(object):
             to the class hierarchy.
         """
         return "(%d,%d,%s,%s)" % (self.start, self.length, self.name,
-            self.datatype)
-
+                                  self.datatype)
 
     def __repr__(self):
         return "SeerAttribute" + self._get_repr()
@@ -123,7 +129,6 @@ class SeerAttribute(object):
         """
         return self._get_from_seer(seer_string)
 
-
     def is_match(self, seer_string, match):
         """Utility method to test if the match parameter matches this
         attribute's value from the SEER row.
@@ -141,6 +146,7 @@ class SeerAttribute(object):
             return True
         else:
             return False
+
 
 class SurvivalTimeRecode(SeerAttribute):
     """Derived SeerAttribute that encapsulates the Survival Time Recode.
@@ -168,20 +174,36 @@ class SurvivalTimeRecode(SeerAttribute):
         if "9999" in val or ' ' in val:
             return "?"
         else:
-            print "orignal: " + val
+
             years = int(val[0:2])
             months = int(val[2:4])
 
             time = years * 12 + months
             converted = str(time)
-            print converted
+
             return converted
 
+    def _to_nominal(self, months):
+
+        months = int(months)
+        TIER1 = 12 * 1  # 2 years
+        TIER2 = 12 * 4  # 4 years
+
+        if months <= TIER1:
+            return '1'
+        elif months <= TIER2:
+            return '2'
+        else:
+            return '3'
+
     def get_attribute(self, seer_string):
-        return self._to_months(seer_string)
+        return self._to_nominal(self._to_months(seer_string))
 
     def __repr__(self):
         return "SurvivalTimeRecode" + self._get_repr()
+
+    def get_meta_string(self):
+        return "@attribute %s {1,2,3}" % (self.name)
 
 class VitalStatusRecode(SeerAttribute):
 
@@ -189,9 +211,7 @@ class VitalStatusRecode(SeerAttribute):
 
         DEAD_CODE = '4'
 
-        val = self._get_from_seer(seer_string)
-
-        return self.is_match(val, DEAD_CODE)
+        return self.is_match(seer_string, DEAD_CODE)
 
     def __repr__(self):
         return "VitalStatusRecode" + self._get_repr()
@@ -201,9 +221,11 @@ class CauseSpecificDeathClassification(SeerAttribute):
     def is_dead_from_cancer(self, seer_string):
         DEAD_OF_CANCER = "1"
 
-        val = self._get_from_seer(seer_string)
+        return self.is_match(seer_string, DEAD_OF_CANCER)
 
-        return self.is_match(val, DEAD_OF_CANCER)
+    def __repr__(self):
+        return "CauseSpecificDeathClassification" + self._get_repr()
+
 
 class AJCCStage3rdEdition(SeerAttribute):
 
@@ -212,6 +234,9 @@ class AJCCStage3rdEdition(SeerAttribute):
         val = self._get_from_seer(seer_string)
 
         return re.search(stage4, val)
+
+    def __repr__(self):
+        return "AJCCStage3rdEdition" + self._get_repr()
 
 def convert_seer_to_arff(types_list, seer_string):
     output = ""
@@ -230,6 +255,23 @@ def count_matches(seer_file, query):
                 count = count + 1
 
     return count
+
+def get_year_filter(year, seer_attribs):
+
+    def is_year_greater_than(seer_string):
+
+        val = seer_attribs['year-of-dx'].get_attribute(seer_string)
+
+        if '?' in val:
+            return False
+
+        year_from_seer = int(val)
+
+        if year > year_from_seer:
+            return True
+        else:
+            return False
+
 
 def get_truth_combinator(func_list):
     """Return an is_all_true function that closes over func_list
@@ -256,66 +298,130 @@ def get_truth_combinator(func_list):
 
     return is_all_true
 
+
+def builder(seer, cls, name, start, length, datatype="numeric"):
+    seer[name] = cls(start, length, name, datatype)
+
+
 def load_seer_types():
 
-    seer_types = dict()
 
-    seer_types['marital-status-at-dx'] = SeerAttribute(19, 1, 'marital-status-at-dx')
-    seer_types['sex'] = SeerAttribute(24, 1, 'sex')
-    seer_types['age-at-dx'] = SeerAttribute(25, 3, 'age-at-dx')
-    seer_types['birth-place'] = SeerAttribute(32, 3, 'birth-place')
-    seer_types['sequence-number-central'] = SeerAttribute(35, 2, 'sequence-number-central')
-    seer_types['year-of-dx'] = SeerAttribute(39, 4, 'year-of-dx')
-    seer_types['primary-site'] = SeerAttribute(43, 4, 'primary-site')
-    seer_types['laterality'] = SeerAttribute(47, 1, 'laterality')
-    seer_types['histology'] = SeerAttribute(48, 4, 'histology')
-    seer_types['histologic-type'] = SeerAttribute(53, 4, 'histologic-type')
-    seer_types['grade'] = SeerAttribute(58, 1, 'grade')
-    seer_types['dx-confirmation'] = SeerAttribute(59, 1, 'dx-confirmation')
-    seer_types['eod-tumor-size'] = SeerAttribute(61, 3, 'eod-tumor-size')
-    seer_types['eod-extension'] = SeerAttribute(64, 2, 'eod-extension')
-    seer_types['eod-lymph-node-involv'] = SeerAttribute(68, 1, 'eod-lymph-node-involv')
-    seer_types['regional-nodes-positive'] = SeerAttribute(69, 2, 'regional-nodes-positive')
-    seer_types['regional-nodes-examined'] = SeerAttribute(71, 2, 'regional-nodes-examined')
-    seer_types['tumor-marker-1'] = SeerAttribute(93, 1, 'tumor-marker-1')
-    seer_types['tumor-marker-2'] = SeerAttribute(94, 1, 'tumor-marker-2')
-    seer_types['cs-tumor-size'] = SeerAttribute(96, 3, 'cs-tumor-size')
-    #http://web2.facs.org/cstage0204/breast/Breast_hau.html
-    seer_types['cs-mets-at-dx'] = SeerAttribute(105, 2, 'cs-mets-at-dx')
-    seer_types['cs-site-specific-factor-3'] = SeerAttribute(113, 3, 'cs-site-specific-factor-3')
-    seer_types['cs-site-specific-factor-4'] = SeerAttribute(116, 3, 'cs-site-specific-factor-4')
-    seer_types['cs-site-specific-factor-5'] = SeerAttribute(119, 3, 'cs-site-specific-factor-5')
-    seer_types['cs-site-specific-factor-6'] = SeerAttribute(122, 3, 'cs-site-specific-factor-6')
-    seer_types['derived-ajcc-t'] = SeerAttribute(128, 2, 'derived-ajcc-t')
-    seer_types['derived-ajcc-n'] = SeerAttribute(130, 2, 'derived-ajcc-n')
-    seer_types['derived-ajcc-m'] = SeerAttribute(132, 2, 'derived-ajcc-m')
-    seer_types['rx-summ-surg-prim-site'] = SeerAttribute(159, 2, 'rx-summ-surg-prim-site')
-    seer_types['rx-summ-scope-reg-ln-sur'] = SeerAttribute(161, 1, 'rx-summ-scope-reg-ln-sur')
-    seer_types['rx-summ-surg-oth-reg-dis'] = SeerAttribute(162, 1, 'rx-summ-surg-oth-reg-dis')
-    seer_types['rx-summ-reg-ln-examined'] = SeerAttribute(163, 2, 'rx-summ-reg-ln-examined')
-    seer_types['rx-summ-reconstruct-1'] = SeerAttribute(165, 1, 'rx-summ-reconstruct-1')
-    seer_types['reason-for-no-surgery'] = SeerAttribute(166, 1, 'reason-for-no-surgery')
-    seer_types['rx-summ-radiation'] = SeerAttribute(167, 1, 'rx-summ-radiation')
-    seer_types['rx-summ-surg-rad-seq'] = SeerAttribute(169, 1, 'rx-summ-surg-rad-seq')
-    seer_types['rx-summ-surg-site-98-02'] = SeerAttribute(172, 2, 'rx-summ-surg-site-98-02')
-    seer_types['seer-record-number'] = SeerAttribute(176, 2, 'seer-record-number')
-    seer_types['race-recode'] = SeerAttribute(234, 1, 'race-recode')
-    seer_types['origin-recode'] = SeerAttribute(235, 1, 'origin-recode')
-    seer_types['seer-historic-stage-a'] = SeerAttribute(236, 1, 'seer-historic-stage-a')
-    seer_types['number-of-primaries'] = SeerAttribute(243, 2, 'number-of-primaries')
-    seer_types['first-malignant-primary-indicator'] = SeerAttribute(245, 1, 'first-malignant-primary-indicator')
-    seer_types['survival-time-recode'] = SurvivalTimeRecode(251, 4, 'survival-time-recode')
-    seer_types['vital-status-recode'] = VitalStatusRecode(265, 1, 'vital-status-recode')
-    seer_types['seer-cause-specific-death-classification'] = SeerAttribute(272, 1, 'seer-cause-specific-death-classification')
-    seer_types['er-status-recode-breast-cancer'] = SeerAttribute(278, 1, 'er-status-recode-breast-cancer')
-    seer_types['pr-status-recode-breast-cancer'] = SeerAttribute(279, 1, 'pr-status-recode-breast-cancer')
-    seer_types['cs-site-specific-factor-8'] = SeerAttribute(282, 3, 'cs-site-specific-factor-8')
-    seer_types['cs-site-specific-factor-10'] = SeerAttribute(285, 3, 'cs-site-specific-factor-10')
-    seer_types['cs-site-specific-factor-11'] = SeerAttribute(288, 3, 'cs-site-specific-factor-11')
-    seer_types['cs-site-specific-factor-15'] = SeerAttribute(294, 3, 'cs-site-specific-factor-15')
-    seer_types['cs-site-specific-factor-16'] = SeerAttribute(297, 3, 'cs-site-specific-factor-16')
-    seer_types['lymph-vascular-invasion'] = SeerAttribute(300, 1, 'lymph-vascular-invasion')
-    seer_types['ajcc-stage-3rd-edition'] = AJCCStage3rdEdition(237, 2, 'ajcc-stage-3rd-edition')
-    return seer_types
+
+    attribs = dict()
+
+    builder(attribs, SeerAttribute, 'marital-status-at-dx', 19, 1)
+    builder(attribs, SeerAttribute, 'sex', 24, 1)
+    builder(attribs, SeerAttribute, 'age-at-dx', 25, 3)
+    builder(attribs, SeerAttribute, 'birth-place', 32, 3)
+    builder(attribs, SeerAttribute, 'sequence-number-central', 35, 2)
+    builder(attribs, SeerAttribute, 'year-of-dx', 39, 4)
+    builder(attribs, SeerAttribute, 'primary-site', 43, 4, 'string')
+    builder(attribs, SeerAttribute, 'laterality', 47, 1)
+    builder(attribs, SeerAttribute, 'histology', 48, 4)
+    builder(attribs, SeerAttribute, 'histologic-type', 53, 4)
+    builder(attribs, SeerAttribute, 'grade', 58, 1)
+    builder(attribs, SeerAttribute, 'dx-confirmation', 59, 1)
+    builder(attribs, SeerAttribute, 'eod-tumor-size', 61, 3)
+    builder(attribs, SeerAttribute, 'eod-extension', 64, 2)
+    builder(attribs, SeerAttribute, 'eod-lymph-node-involv', 68, 1)
+    builder(attribs, SeerAttribute, 'regional-nodes-positive', 69, 2)
+    builder(attribs, SeerAttribute, 'regional-nodes-examined', 71, 2)
+    builder(attribs, SeerAttribute, 'tumor-marker-1', 93, 1)
+    builder(attribs, SeerAttribute, 'tumor-marker-2', 94, 1)
+    builder(attribs, SeerAttribute, 'cs-tumor-size', 96, 3)
+    builder(attribs, SeerAttribute, 'cs-extension', 99, 3)
+    builder(attribs, SeerAttribute, 'cs-lymph-nodes', 102, 3)
+    builder(attribs, SeerAttribute, 'cs-mets-at-dx', 105, 2)
+    builder(attribs, SeerAttribute, 'cs-site-specific-factor-1', 107, 3)
+    builder(attribs, SeerAttribute, 'cs-site-specific-factor-2', 110, 3)
+    builder(attribs, SeerAttribute, 'cs-site-specific-factor-3', 113, 3)
+    builder(attribs, SeerAttribute, 'cs-site-specific-factor-4', 116, 3)
+    builder(attribs, SeerAttribute, 'cs-site-specific-factor-5', 119, 3)
+    builder(attribs, SeerAttribute, 'cs-site-specific-factor-6', 122, 3)
+    builder(attribs, SeerAttribute, 'derived-ajcc-t', 128, 2)
+    builder(attribs, SeerAttribute, 'derived-ajcc-n', 130, 2)
+    builder(attribs, SeerAttribute, 'derived-ajcc-m', 132, 2)
+    builder(attribs, SeerAttribute, 'rx-summ-surg-prim-site', 159, 2)
+    builder(attribs, SeerAttribute, 'rx-summ-scope-reg-ln-sur', 161, 1)
+    builder(attribs, SeerAttribute, 'rx-summ-surg-oth-reg-dis', 162, 1)
+    builder(attribs, SeerAttribute, 'rx-summ-reg-ln-examined', 163, 2)
+    builder(attribs, SeerAttribute, 'rx-summ-reconstruct-1', 165, 1)
+    builder(attribs, SeerAttribute, 'reason-for-no-surgery', 166, 1)
+    builder(attribs, SeerAttribute, 'rx-summ-radiation', 167, 1)
+    builder(attribs, SeerAttribute, 'rx-summ-surg-rad-seq', 169, 1)
+    builder(attribs, SeerAttribute, 'rx-summ-surg-site-98-02', 172, 2)
+    builder(attribs, SeerAttribute, 'seer-record-number', 176, 2)
+    builder(attribs, SeerAttribute, 'race-recode', 234, 1)
+    builder(attribs, SeerAttribute, 'origin-recode', 235, 1)
+    builder(attribs, SeerAttribute, 'seer-historic-stage-a', 236, 1)
+    builder(attribs, SeerAttribute, 'number-of-primaries', 243, 2)
+    builder(attribs, SeerAttribute, 'first-malignant-primary-indicator',
+            245, 1)
+    builder(attribs, SurvivalTimeRecode, 'survival-time-recode', 251, 4)
+    builder(attribs, VitalStatusRecode, 'vital-status-recode', 265, 1)
+    builder(attribs, CauseSpecificDeathClassification,
+            'seer-cause-specific-death-classification', 272, 1)
+    builder(attribs, SeerAttribute, 'er-status-recode-breast-cancer', 278, 1)
+    builder(attribs, SeerAttribute, 'pr-status-recode-breast-cancer', 279, 1)
+    builder(attribs, SeerAttribute, 'cs-site-specific-factor-8', 282, 3)
+    builder(attribs, SeerAttribute, 'cs-site-specific-factor-10', 285, 3)
+    builder(attribs, SeerAttribute, 'cs-site-specific-factor-11', 288, 3)
+    builder(attribs, SeerAttribute, 'cs-site-specific-factor-15', 294, 3)
+    builder(attribs, SeerAttribute, 'cs-site-specific-factor-16', 297, 3)
+    builder(attribs, SeerAttribute, 'lymph-vascular-invasion', 300, 1)
+    builder(attribs, AJCCStage3rdEdition, 'ajcc-stage-3rd-edition', 237, 2)
+
+    return attribs
+
 
 d = load_seer_types()
+
+def get_relation():
+    return "@relation breast"
+
+def format_instance(row, attributes):
+
+    output = ""
+    for attrib in attributes:
+        output = output + attrib.get_attribute(row) + ","
+
+    output = output[:len(output)-1]  # removing trailing comma
+
+    return output
+
+
+def to_arff(attribs, seer_file, output, filters=None):
+
+    log.info("Started conversion.")
+
+    keys = attribs.values()
+
+    with open(output, "w") as outfile:
+        with open(seer_file) as infile:
+
+            outfile.write(get_relation() + "\n")
+
+            for k in keys:
+                outfile.write(k.get_meta_string() + "\n")
+
+            outfile.write("\n@data\n")
+
+            totalRecords = 0
+            selectedRecords = 0
+
+            for line in infile:
+                totalRecords += 1
+
+                if filters == None or filters(line):
+
+                    outfile.write(format_instance(line, keys) + "\n")
+                    selectedRecords += 1
+
+
+    log.info("Processed %d total records" % (totalRecords))
+    log.info("Selected %d records" % (selectedRecords))
+
+
+filters = [d['ajcc-stage-3rd-edition'].is_stage_iv,
+           d['seer-cause-specific-death-classification'].is_dead_from_cancer,
+           d['vital-status-recode'].is_dead]
