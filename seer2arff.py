@@ -11,6 +11,9 @@ log = logging.getLogger('seer2arff')
 
 breast = "/Users/jdatko/cs610/SEER_1973_2009_TEXTDATA/incidence/yr1973_2009.seer9/BREAST.txt"
 
+# The default survival time recode value.  This can be changed with a command line option
+DEFAULT_STR = 24
+
 
 def nines_to_question_mark(value):
     """Most of the SEER attributes use all nines to indicate missing or unkown
@@ -166,16 +169,16 @@ class SeerAttribute(object):
 
 
 class SeerNominalAttribute(SeerAttribute):
+    """Class definition for SEER nominal data types (those with categorical
+    data).  Extends SeerAttribute to provide a custom attribute string.
+    """
 
     def get_meta_string(self):
         return "@attribute %s %s" % (self.name, self.datatype)
 
-    # def get_attribute(self, seer_string):
-    #     val = super(SeerNominalAttribute,self).get_attribute(seer_string)
-    #     return nines_to_question_mark(val)
-
     def __repr__(self):
         return "SeerNominalAttribute" + self._get_repr()
+
 
 class ErPrStatusRecord(SeerNominalAttribute):
 
@@ -192,7 +195,7 @@ class ErPrStatusRecord(SeerNominalAttribute):
         return "ErPrStatusRecord" + self._get_repr()
 
 
-class SurvivalTimeRecode(SeerAttribute):
+class SurvivalTimeRecode(SeerNominalAttribute):
     """Derived SeerAttribute that encapsulates the Survival Time Recode.
 
     STR is defined as (from the SEER data dictionary): The Survival Time Recode
@@ -230,8 +233,7 @@ class SurvivalTimeRecode(SeerAttribute):
     def _to_nominal(self, months):
 
         months = int(months)
-        TIER1 = 12 * 4
-
+        TIER1 = DEFAULT_STR
 
         if months <= TIER1:
             return '1'
@@ -243,9 +245,6 @@ class SurvivalTimeRecode(SeerAttribute):
 
     def __repr__(self):
         return "SurvivalTimeRecode" + self._get_repr()
-
-    def get_meta_string(self):
-        return "@attribute %s {1,2}" % (self.name)
 
 class VitalStatusRecode(SeerAttribute):
 
@@ -352,7 +351,7 @@ def load_seer_types():
     attribs = dict()
 
     builder(attribs, SeerNominalAttribute, 'marital-status-at-dx', 19, 1,
-            '{1,2,3,4,5,6,9}')
+            '{1,2,3,4,5}')
     #builder(attribs, SeerNominalAttribute, 'sex', 24, 1, '{1,2}')
     builder(attribs, SeerAttribute, 'age-at-dx', 25, 3)
     #builder(attribs, SeerAttribute, 'birth-place', 32, 3)
@@ -362,11 +361,11 @@ def load_seer_types():
     #builder(attribs, SeerAttribute, 'laterality', 47, 1)
     #builder(attribs, SeerAttribute, 'histology', 48, 4)
     #builder(attribs, SeerAttribute, 'histologic-type', 53, 4)
-    builder(attribs, SeerNominalAttribute, 'grade', 58, 1, '{1,2,3,4,5,6,7,8,9}')
+    builder(attribs, SeerNominalAttribute, 'grade', 58, 1, '{1,2,3,4}')
     #builder(attribs, SeerAttribute, 'dx-confirmation', 59, 1)
     builder(attribs, SeerAttribute, 'eod-tumor-size', 61, 3)
     #builder(attribs, SeerAttribute, 'eod-extension', 64, 2)
-    builder(attribs, SeerNominalAttribute, 'eod-lymph-node-involv', 68, 1, '{0,1,2,3,4,5,6,7,8,9}')
+    builder(attribs, SeerNominalAttribute, 'eod-lymph-node-involv', 68, 1, '{0,1,2,3,4,5,6,7,8}')
     #builder(attribs, SeerAttribute, 'regional-nodes-positive', 69, 2)
     #builder(attribs, SeerAttribute, 'regional-nodes-examined', 71, 2)
     #builder(attribs, SeerNominalAttribute, 'tumor-marker-1', 93, 1, '{0,1,2,3,8,9}')
@@ -389,25 +388,25 @@ def load_seer_types():
     #builder(attribs, SeerAttribute, 'rx-summ-surg-oth-reg-dis', 162, 1)
     #builder(attribs, SeerAttribute, 'rx-summ-reg-ln-examined', 163, 2)
     #builder(attribs, SeerAttribute, 'rx-summ-reconstruct-1', 165, 1)
-    builder(attribs, SeerNominalAttribute, 'reason-for-no-surgery', 166, 1, '{0,1,2,5,6,7,8,9}')
+    builder(attribs, SeerNominalAttribute, 'reason-for-no-surgery', 166, 1, '{0,1,2,6,7,8}')
     #builder(attribs, SeerAttribute, 'rx-summ-radiation', 167, 1)
     #builder(attribs, SeerAttribute, 'rx-summ-surg-rad-seq', 169, 1)
     #builder(attribs, SeerAttribute, 'rx-summ-surg-site-98-02', 172, 2)
     #builder(attribs, SeerAttribute, 'seer-record-number', 176, 2)
-    builder(attribs, SeerNominalAttribute, 'race-recode', 234, 1, '{1,2,3,4,7,9}')
+    builder(attribs, SeerNominalAttribute, 'race-recode', 234, 1, '{1,2,3,4,7}')
     #builder(attribs, SeerAttribute, 'origin-recode', 235, 1)
     #builder(attribs, SeerAttribute, 'seer-historic-stage-a', 236, 1)
     #builder(attribs, SeerAttribute, 'number-of-primaries', 243, 2)
     #builder(attribs, SeerAttribute, 'first-malignant-primary-indicator',
     #        245, 1)
-    builder(attribs, SurvivalTimeRecode, 'survival-time-recode', 251, 4)
+    builder(attribs, SurvivalTimeRecode, 'survival-time-recode', 251, 4, '{1,2}')
     builder(attribs, VitalStatusRecode, 'vital-status-recode', 265, 1)
     builder(attribs, CauseSpecificDeathClassification,
             'seer-cause-specific-death-classification', 272, 1)
     builder(attribs, ErPrStatusRecord, 'er-status-recode-breast-cancer', 278,
-            1, '{1,2,3,4,9}')
+            1, '{1,2,3}')
     builder(attribs, ErPrStatusRecord, 'pr-status-recode-breast-cancer', 279,
-            1, '{1,2,3,4,9}')
+            1, '{1,2,3}')
     #builder(attribs, SeerAttribute, 'cs-site-specific-factor-8', 282, 3)
     #builder(attribs, SeerAttribute, 'cs-site-specific-factor-10', 285, 3)
     #builder(attribs, SeerAttribute, 'cs-site-specific-factor-11', 288, 3)
@@ -477,9 +476,16 @@ if __name__=="__main__":
 
     parser = optparse.OptionParser()
 
+    # Get the option for survival time recode length
+    parser.add_option("-t", "--time", action="store", type="int", dest="time", default=DEFAULT_STR)
+
     #parse the command line
     opts, args = parser.parse_args()
 
     output_file = args[0]
+
+    DEFAULT_STR = opts.time
+
+    log.info("Using survival time recode value of %d months" % (DEFAULT_STR))
 
     to_arff(d, breast, output_file, get_truth_combinator(filters))
