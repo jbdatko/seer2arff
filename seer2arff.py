@@ -230,15 +230,13 @@ class SurvivalTimeRecode(SeerAttribute):
     def _to_nominal(self, months):
 
         months = int(months)
-        TIER1 = 12 * 1  # 2 years
-        TIER2 = 12 * 4  # 4 years
+        TIER1 = 12 * 4
+
 
         if months <= TIER1:
             return '1'
-        elif months <= TIER2:
-            return '2'
         else:
-            return '3'
+            return '2'
 
     def get_attribute(self, seer_string):
         return self._to_nominal(self._to_months(seer_string))
@@ -247,7 +245,7 @@ class SurvivalTimeRecode(SeerAttribute):
         return "SurvivalTimeRecode" + self._get_repr()
 
     def get_meta_string(self):
-        return "@attribute %s {1,2,3}" % (self.name)
+        return "@attribute %s {1,2}" % (self.name)
 
 class VitalStatusRecode(SeerAttribute):
 
@@ -355,7 +353,7 @@ def load_seer_types():
 
     builder(attribs, SeerNominalAttribute, 'marital-status-at-dx', 19, 1,
             '{1,2,3,4,5,6,9}')
-    builder(attribs, SeerNominalAttribute, 'sex', 24, 1, '{1,2}')
+    #builder(attribs, SeerNominalAttribute, 'sex', 24, 1, '{1,2}')
     builder(attribs, SeerAttribute, 'age-at-dx', 25, 3)
     #builder(attribs, SeerAttribute, 'birth-place', 32, 3)
     #builder(attribs, SeerAttribute, 'sequence-number-central', 35, 2)
@@ -371,8 +369,8 @@ def load_seer_types():
     builder(attribs, SeerNominalAttribute, 'eod-lymph-node-involv', 68, 1, '{0,1,2,3,4,5,6,7,8,9}')
     #builder(attribs, SeerAttribute, 'regional-nodes-positive', 69, 2)
     #builder(attribs, SeerAttribute, 'regional-nodes-examined', 71, 2)
-    builder(attribs, SeerNominalAttribute, 'tumor-marker-1', 93, 1, '{0,1,2,3,8,9}')
-    builder(attribs, SeerNominalAttribute, 'tumor-marker-2', 94, 1, '{0,1,2,3,8,9}')
+    #builder(attribs, SeerNominalAttribute, 'tumor-marker-1', 93, 1, '{0,1,2,3,8,9}')
+    #builder(attribs, SeerNominalAttribute, 'tumor-marker-2', 94, 1, '{0,1,2,3,8,9}')
     #builder(attribs, SeerAttribute, 'cs-tumor-size', 96, 3)
     #builder(attribs, SeerAttribute, 'cs-extension', 99, 3)
     #builder(attribs, SeerAttribute, 'cs-lymph-nodes', 102, 3)
