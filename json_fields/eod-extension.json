@@ -1,7 +1,0 @@
-{
-    "name" : "eod-extension",
-    "start" : 64,
-    "length" : 2,
-    "datatype" : "numeric",
-    "codes" : {}
-}

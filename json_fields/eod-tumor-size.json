@@ -1,7 +1,0 @@
-{
-    "name" : "eod-tumor-size",
-    "start" : 61,
-    "length" : 3,
-    "datatype" : "numeric",
-    "codes" : {}
-}
